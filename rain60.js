@@ -5,12 +5,9 @@ $(function() {
   var map = d3.select('#map')
     .append('svg').attr({
       width: MAP_WIDTH, height: MAP_HEIGHT
-    })
+    });
 
-  var tooltip = d3.select('body')
-    .append('div')
-    .attr({ class: 'tooltip' })
-    .style({ opacity: 0 })
+  var tooltip = d3.select('#tooltip');
 
   d3.json(BASE_URL+'/gis/shizuoka_utf8.json', function(json) { // 静岡県地図データ
     drawMap(json);
@@ -67,28 +64,27 @@ $(function() {
       });
 
     points
-      .on('mouseover', function(d, event) {
-        d.values = d.values || {}
-        tooltip
-          .html('<dl>'
-                + '<dd class="name">' + d.pointname + '</dd>'
-                + '<dd class="addr">住所:' + (d.address || '--') + '</dd>'
-                + '<dd class="rain">'
-                + '<span>10分雨量 = ' + (d.values.rain_10min || '--') + '</span>'
-                + ' / '
-                + '<span>60分雨量 = ' + (d.values.rain_60min || '--') + '</span>'
-                + '</dd>'
-                + '</dl>')
-          .style({
-            top: d3.event.pageY+'px',
-            left: d3.event.pageX+'px',
-            opacity: 1
-          });
-      })
-      .on('mouseout', function(d) {
-        tooltip.style({ opacity: 0 });
-      });
+      .on('mouseover', showTooltip)
+      .on('mouseover', hideTooltip);
   }
+
+  function showTooltip(d) {
+    d.values = d.values || {}
+    tooltip.select('.name').text(d.pointname);
+    tooltip.select('.address').text(d.address || '--');
+    tooltip.select('.rain10').text(d.values.rain_10min || '--');
+    tooltip.select('.rain60').text(d.values.rain_60min || '--');
+    tooltip.style({
+      top: d3.event.pageY + 'px',
+      left: d3.event.pageX + 'px',
+      display: 'block'
+    });
+  }
+
+  function hideTooptip() {
+    tooltip.style({ display: 'none' });
+  }
+
 
   function loadRainData() {
     var datetime = getDatetime(),
