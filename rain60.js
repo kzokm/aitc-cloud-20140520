@@ -7,7 +7,21 @@ $(function() {
       width: MAP_WIDTH, height: MAP_HEIGHT
     })
 
+  var tooltip = d3.select('body')
+    .append('div')
+    .attr({ class: 'tooltip' })
+    .style({ opacity: 0 })
+
   d3.json(BASE_URL+'/gis/shizuoka_utf8.json', function(json) { // 静岡県地図データ
+    drawMap(json);
+    d3.csv(BASE_URL+'Shizuoka_Rain_ObservationPoint_utf8.csv') // 雨量観測局情報
+      .get(function(error, rows) {
+        drawRainPoints(rows);
+        loadRainData();
+      });
+  });
+
+  function drawMap(json) {
     map.projection = d3.geo.mercator()
       .scale(15000)
       .center(d3.geo.centroid(json))
@@ -25,73 +39,58 @@ $(function() {
           fill: 'hsl(0,0%,80%)',
           stroke: 'hsl(80,100%,0%)'
         });
+  }
 
-    var tooltip = d3.select('body')
-      .append('div')
-      .attr({ class: 'tooltip' })
-      .style({ opacity: 0 })
+  function drawRainPoints(data) {
+    var points = map.selectAll('.rain-point')
+      .data(data).enter()
+      .append('g')
+      .attr({
+        id: function(d) {
+          return 'rp_' + d.point_id;
+        },
+        class: 'rain-point',
+        transform: function(d) {
+          var pos = map.projection([d.longitude/10000, d.latitude/10000]);
+          return 'translate(' + pos[0] + ',' + pos[1] + ')';
+        }
+      });
 
-    var rainPoints = (function() {
-      var info = csvToArray( // 雨量観測局情報
-        $.ajax({
-          url: BASE_URL+'Shizuoka_Rain_ObservationPoint_utf8.csv',
-          async: false
-        }).responseText);
+    points.append('circle')
+      .attr({
+        class: 'node',
+        r: 5
+      })
+      .style({
+        stroke: '#000',
+        fill: '#fff'
+      });
 
-      var points = map.selectAll('.rain-point')
-        .data(info).enter()
-        .append('g')
-        .attr({
-          id: function(d) {
-            return 'rp_' + d.point_id;
-          },
-          class: 'rain-point',
-          transform: function(d) {
-            var pos = map.projection([d.longitude/10000, d.latitude/10000]);
-            return 'translate(' + pos[0] + ',' + pos[1] + ')';
-          }
-        });
+    points
+      .on('mouseover', function(d, event) {
+        d.values = d.values || {}
+        tooltip
+          .html('<dl>'
+                + '<dd class="name">' + d.pointname + '</dd>'
+                + '<dd class="addr">住所:' + (d.address || '--') + '</dd>'
+                + '<dd class="rain">'
+                + '<span>10分雨量 = ' + (d.values.rain_10min || '--') + '</span>'
+                + ' / '
+                + '<span>60分雨量 = ' + (d.values.rain_60min || '--') + '</span>'
+                + '</dd>'
+                + '</dl>')
+          .style({
+            top: d3.event.pageY+'px',
+            left: d3.event.pageX+'px',
+            opacity: 1
+          });
+      })
+      .on('mouseout', function(d) {
+        tooltip.style({ opacity: 0 });
+      });
+  }
 
-      points.append('circle')
-        .attr({
-          class: 'node',
-          r: 5
-        })
-        .style({
-          stroke: '#000',
-          fill: '#fff'
-        });
-
-      points
-        .on('mouseover', function(d, event) {
-          d.values = d.values || {}
-          tooltip
-            .html('<dl>'
-                  + '<dd class="name">' + d.pointname + '</dd>'
-                  + '<dd class="addr">住所:' + (d.address || '--') + '</dd>'
-                  + '<dd class="rain">'
-                  + '<span>10分雨量 = ' + (d.values.rain_10min || '--') + '</span>'
-                  + ' / '
-                  + '<span>60分雨量 = ' + (d.values.rain_60min || '--') + '</span>'
-                  + '</dd>'
-                  + '</dl>')
-            .style({
-              top: d3.event.pageY+'px',
-              left: d3.event.pageX+'px',
-              opacity: 1
-            });
-        })
-        .on('mouseout', function(d) {
-          tooltip.style({ opacity: 0 });
-        });
-
-      return points;
-    })();
-
-    loadRainData();
-  });
-
-  var loadRainData = function() {
+  function loadRainData() {
     var datetime = getDatetime(),
         date = datetime[0].split('-').join(''),
         time = datetime[1].replace(':', '').substring(0, 3) + '0'
@@ -100,25 +99,25 @@ $(function() {
     var date = $(':input[name=date]').val().split('-').join('');
     var time = $(':input[name=time]').val().replace(':', '');
 
-    var rainData = (function() { // 雨量情報
-      var hash = {}
-      var data = csvToArray(
-        $.ajax({
-          url: BASE_URL+'Rain/' + date + '/' + time + '.csv',
-          async: false,
-          error: function() {
-            clearInterval(timer);
-          }
-        }).responseText);
-      $.each(data, function(i, val) {
-        hash[val.point_id] = val;
-      });
-      return hash;
-    })();
+    d3.csv(BASE_URL+'Rain/' + date + '/' + time + '.csv')
+      .get(function(error, rows) {
+        if (error) {
+          clearInterval(timer);
+          return;
+        }
 
+        var hash = {}
+        $.each(rows, function(i, val) {
+          hash[val.point_id] = val;
+        });
+        showRainData(hash);
+      });
+  }
+
+  function showRainData(data) {
     map.selectAll('.rain-point')
       .datum(function(d) { // 雨量観測局データに雨量をマージする
-        d.values = rainData[d.point_id] || {}
+        d.values = data[d.point_id] || {}
         return d;
       })
       .select('circle')
@@ -137,7 +136,7 @@ $(function() {
             }
           }
         });
-  };
+  }
 
 
   var datatype;
@@ -152,7 +151,7 @@ $(function() {
   $date.initialValue = $date.val();
   $time.initialValue = $time.val();
 
-  var getDatetime = function() {
+  function getDatetime() {
     var date = $date.val() || $date.initialValue;
     var time = $time.val() || $time.initialValue;
     $date.val(date);
@@ -188,25 +187,6 @@ $(function() {
   });
 });
 
-// 簡易版CSV→Array変換
-// １行目はヘッダ
-function csvToArray(csv) {
-  var array = new Array();
-
-  var lines = csv.split('\n');
-  var headers = lines[0].split(',');
-  for (var i = 1; i < lines.length; i++){
-    var cols = lines[i].split(',');
-    if (cols.length <= 1) continue;
-    var json = new Object();
-    for (var j = 0; j < cols.length; j++){
-      json[headers[j]] = cols[j];
-    }
-    array.push(json);
-  }
-
-  return array;
-}
 
 function formatDate(date) {
   var year = date.getFullYear(),
