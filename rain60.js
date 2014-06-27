@@ -14,8 +14,8 @@ $(function() {
 
   d3.json(BASE_URL+'/gis/shizuoka_utf8.json', function(json) { // 静岡県地図データ
     drawMap(json);
-    d3.csv(BASE_URL+'Shizuoka_Rain_ObservationPoint_utf8.csv') // 雨量観測局情報
-      .get(function(error, rows) {
+    d3.csv(BASE_URL+'Shizuoka_Rain_ObservationPoint_utf8.csv', // 雨量観測局情報
+      function(error, rows) {
         drawRainPoints(rows);
         loadRainData();
       });
@@ -99,8 +99,8 @@ $(function() {
     var date = $(':input[name=date]').val().split('-').join('');
     var time = $(':input[name=time]').val().replace(':', '');
 
-    d3.csv(BASE_URL+'Rain/' + date + '/' + time + '.csv')
-      .get(function(error, rows) {
+    d3.csv(BASE_URL+'Rain/' + date + '/' + time + '.csv',
+      function(error, rows) {
         if (error) {
           clearInterval(timer);
           return;
@@ -165,6 +165,7 @@ $(function() {
     loadRainData();
   });
 
+
   var timer;
 
   $(':input[name=play]').click(function(event) {
@@ -180,23 +181,22 @@ $(function() {
     }, 500);
   });
 
+  function formatDate(date) {
+    var year = date.getFullYear(),
+        month = date.getMonth() + 1,
+        day = date.getDate();
+    if (month < 10) {
+      month = '0' + month;
+    }
+    if (day < 10) {
+      day = '0' + day;
+    }
+    return year + '-' + month + '-' + day;
+  }
+
   $(':input[name=stop]').click(function(event) {
     event.preventDefault();
     clearInterval(timer);
     $('.player').toggle('hidden');
   });
 });
-
-
-function formatDate(date) {
-  var year = date.getFullYear(),
-      month = date.getMonth() + 1,
-      day = date.getDate();
-  if (month < 10) {
-    month = '0' + month;
-  }
-  if (day < 10) {
-    day = '0' + day;
-  }
-  return year + '-' + month + '-' + day;
-}
