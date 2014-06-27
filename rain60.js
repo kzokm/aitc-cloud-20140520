@@ -65,7 +65,7 @@ $(function() {
 
     points
       .on('mouseover', showTooltip)
-      .on('mouseover', hideTooltip);
+      .on('mouseout', hideTooltip);
   }
 
   function showTooltip(d) {
