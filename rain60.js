@@ -81,7 +81,7 @@ $(function() {
     });
   }
 
-  function hideTooptip() {
+  function hideTooltip() {
     tooltip.style({ display: 'none' });
   }
 
